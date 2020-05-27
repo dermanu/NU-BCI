@@ -1,0 +1,37 @@
+2nd
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 6898.546710 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 312629.569320 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 7079.513838 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 19266.614549 seconds.
+>> 
+
+1st
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 6581.487633 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 332845.522862 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 7443.274056 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+Connected to the parallel pool (number of workers: 8).
+Parallel pool using the 'local' profile is shutting down.
+Elapsed time is 15707.267041 seconds.
+>> 
