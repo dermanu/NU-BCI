@@ -1,4 +1,8 @@
+%% Creates topographic map of the EEG voltage distribution over time
+
 close all
+cfg.layout = 'GSN-HydroCel-129.sfp';
+layout = ft_prepare_layout(cfg)
 load('Layout.mat')
 hpos = 0.02;
 xScaling = 0.80;

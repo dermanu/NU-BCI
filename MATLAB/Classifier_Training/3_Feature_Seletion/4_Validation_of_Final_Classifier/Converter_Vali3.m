@@ -1,11 +1,13 @@
-%% Converts features of v5 training scripts into classfier readable format
+%% Converts and balances features of training scripts into classfier readable format
+
 % clear all
 % close all
 
 load('randomSeed.mat');
 
-folder =  'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Features\Katja\2nd_Session\All';
+folder =  'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Features\Katja\1st_Session\Vali6';
 mat = dir(strcat(folder,'\*.mat'));
+mat = mat(7:9)
 
 allFeatures3All = [];
 featuresLoom    = [];

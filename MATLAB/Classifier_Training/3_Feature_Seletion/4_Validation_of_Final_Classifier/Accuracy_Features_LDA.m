@@ -1,6 +1,7 @@
-%% Use:[AUC ACC] = Accuracy_Features_KNN(balanced2LoomNon, minVect(end,:))
+%% Validation of the LDA used for 11- to 12-month-old infants.
+
 close all
-load('Features_2nd.mat');
+load('2nd_Train_LoomRand.mat');
 load('FilterMatrix_All_2nd_Session.mat');
 load('randomSeed.mat');
 inputTable = balanced2LoomRand;
@@ -93,13 +94,13 @@ for j = 1:length(table2array(predictors))
 end
 
 validationAccuracy2 = a/length(table2array(predictors))
-dat = cat(3, datLoom(1:128,:,:), datRandom(1:128,:,:));
+dat = cat(3, datLoom(:,:,:), datRandom(:,:,:));
 
 for lol = 1:size(dat,3)
-filteredData(lol,:) = diySpatialFilter(P,dat(:,:,lol));
+filteredData(lol,:) = diySpatialFilter(P(:),dat(:,:,lol));
 end
 
-epoch = [0.400 1.250];
+epoch = [0.45 1.25];
 epoch(1) = (1.500 - epoch(1)) * 500;
 epoch(2) = (1.500 - epoch(2)) * 500;
 epoch(3) = 1.500 * 500;
@@ -138,62 +139,136 @@ ax = gca;
 ax.XGrid = 'on';
 
 dat = filteredData';
+% resMat.tt2(1,:) = randsample(resMat.tt(1,:),5,true);
+% resMat.tf2(1,:) = randsample(resMat.tf(1,:),5,true);
+% resMat.ft2(1,:) = randsample(resMat.ft(1,:),5,true);
+% resMat.ff2(1,:) = randsample(resMat.ff(1,:),5,true);
+
 loom{1} = dat(:,cell2mat(resMat.tt(1,:)));
 random{1} = dat(:,cell2mat(resMat.tf(1,:)));
 loom{2} = dat(:,cell2mat(resMat.ft(1,:)));
 random{2} = dat(:,cell2mat(resMat.ff(1,:)));
 
-figure(3)
-figure('Color','white')
-plot(loom{1}, 'LineWidth', 1, 'LineStyle' , '-')
-xline(epoch(3), 'LineWidth', 2.5);
-xline(epoch(1), 'LineStyle', '--');
-xline(epoch(2), 'LineStyle', '--');
-xlabel('Time in sec')
-ylabel('Amplitude in \muV');
-xlim([0 850])
-ylim([-800 700])
-xticks([0:100:800 850])
-xticklabels([0:100:800 850]./500-1.5)
-
 figure(4)
-figure('Color','white')
-plot(loom{2}, 'LineWidth', 1, 'LineStyle' , '-')
+surf(loom{1}', 'EdgeColor', 'None')
+colormap(jet);
+view(0,90)
+axis tight
+xlabel('Time in s')
+ylabel('Trial Number');
 xline(epoch(3), 'LineWidth', 2.5);
 xline(epoch(1), 'LineStyle', '--');
 xline(epoch(2), 'LineStyle', '--');
-xlabel('Time in sec')
-ylabel('Amplitude in \muV');
-xlim([0 850])
-ylim([-800 700])
 xticks([0:100:800 850])
 xticklabels([0:100:800 850]./500-1.5)
+hcb=colorbar
+title(hcb,'Amplitude in \muV', 'Rotation',270, 'FontSize', 10, 'Position', [43,130,0])
+caxis([-500 500])
+
+saveas(4,'2nd_Amp_5_true_loom.jpeg')
+
+% figure('Color','white')
+% plot(loom{1}, 'LineWidth', 1, 'LineStyle' , '-')
+% xline(epoch(3), 'LineWidth', 2.5);
+% xline(epoch(1), 'LineStyle', '--');
+% xline(epoch(2), 'LineStyle', '--');
+% xlabel('Time in sec')
+% ylabel('Amplitude in \muV');
+% xlim([0 850])
+% ylim([-600 600])
+% xticks([0:100:800 850])
+% xticklabels([0:100:800 850]./500-1.5)
+
+
+% figure(4)
+% figure('Color','white')
+% plot(loom{2}, 'LineWidth', 1, 'LineStyle' , '-')
+% xline(epoch(3), 'LineWidth', 2.5);
+% xline(epoch(1), 'LineStyle', '--');
+% xline(epoch(2), 'LineStyle', '--');
+% xlabel('Time in sec')
+% ylabel('Amplitude in \muV');
+% xlim([0 850])
+% ylim([-600 600])
+% xticks([0:100:800 850])
+% xticklabels([0:100:800 850]./500-1.5)
 
 figure(5)
-figure('Color','white')
-plot(random{1}, 'LineWidth', 1, 'LineStyle' , '-')
+surf(loom{2}', 'EdgeColor', 'None')
+colormap(jet);
+view(0,90)
+axis tight
+xlabel('Time in s')
+ylabel('Trial Number');
 xline(epoch(3), 'LineWidth', 2.5);
 xline(epoch(1), 'LineStyle', '--');
 xline(epoch(2), 'LineStyle', '--');
-xlabel('Time in sec')
-ylabel('Amplitude in \muV');
-xlim([0 850])
-ylim([-800 700])
 xticks([0:100:800 850])
 xticklabels([0:100:800 850]./500-1.5)
+hcb=colorbar
+title(hcb,'Amplitude in \muV', 'Rotation',270, 'FontSize', 10, 'Position', [43,130,0])
+caxis([-500 500])
+saveas(5,'2nd_Amp_5_false_loom.jpeg')
+
+% figure(5)
+% figure('Color','white')
+% plot(random{1}, 'LineWidth', 1, 'LineStyle' , '-')
+% xline(epoch(3), 'LineWidth', 2.5);
+% xline(epoch(1), 'LineStyle', '--');
+% xline(epoch(2), 'LineStyle', '--');
+% xlabel('Time in sec')
+% ylabel('Amplitude in \muV');
+% xlim([0 850])
+% ylim([-600 600])
+% xticks([0:100:800 850])
+% xticklabels([0:100:800 850]./500-1.5)
 
 figure(6)
-figure('Color','white')
-plot(random{2}, 'LineWidth', 1, 'LineStyle' , '-')
+surf(random{1}', 'EdgeColor', 'None')
+colormap(jet);
+view(0,90)
+axis tight
+xlabel('Time in s')
+ylabel('Trial Number');
 xline(epoch(3), 'LineWidth', 2.5);
 xline(epoch(1), 'LineStyle', '--');
 xline(epoch(2), 'LineStyle', '--');
-xlabel('Time in sec')
-ylabel('Amplitude in \muV');
-xlim([0 850])
-ylim([-800 700])
 xticks([0:100:800 850])
 xticklabels([0:100:800 850]./500-1.5)
+hcb=colorbar
+title(hcb,'Amplitude in \muV', 'Rotation',270, 'FontSize', 10, 'Position', [43,130,0])
+caxis([-500 500])
+saveas(6,'2nd_Amp_5_true_random.jpeg')
+
+% figure(6)
+% figure('Color','white')
+% plot(random{2}, 'LineWidth', 1, 'LineStyle' , '-')
+% xline(epoch(3), 'LineWidth', 2.5);
+% xline(epoch(1), 'LineStyle', '--');
+% xline(epoch(2), 'LineStyle', '--');
+% xlabel('Time in sec')
+% ylabel('Amplitude in \muV');
+% xlim([0 850])
+% ylim([-600 600])
+% xticks([0:100:800 850])
+% xticklabels([0:100:800 850]./500-1.5)
+
+figure(7)
+surf(random{2}', 'EdgeColor', 'None')
+colormap(jet);
+view(0,90)
+axis tight
+xlabel('Time in s')
+ylabel('Trial Number');
+xline(epoch(3), 'LineWidth', 2.5);
+xline(epoch(1), 'LineStyle', '--');
+xline(epoch(2), 'LineStyle', '--');
+xticks([0:100:800 850])
+xticklabels([0:100:800 850]./500-1.5)
+hcb=colorbar
+title(hcb,'Amplitude in \muV', 'Rotation',270, 'FontSize', 10, 'Position', [43,130,0])
+caxis([-500 500])
+saveas(7,'2nd_Amp_5_false_random.jpeg')
 
 % figure(2)
 % pspectrum(mean(mean(loom{1},3),1),500,'persistence','TimeResolution',0.9, 'FrequencyLimits',[2 25])
@@ -235,7 +310,6 @@ ylim([-40 40])
 xticks([0:100:800 850])
 xticklabels([0:100:800 850]./500-1.5)
 legend('False Loom', 'False Random', 'Collision', 'Epoch')
-
 
 figure(9)
 figure('Color','white')
@@ -281,20 +355,20 @@ ax.XGrid = 'on';
 
 %% Greate table
 tabelRestt =  balanced2LoomRand(cell2mat(resMat.tt(1,:)),logical(minVect(end,:)));
-meantt = mean(table2array(tabelRestt))
-stdtt = std(table2array(tabelRestt))
+meantt = mean(table2array(tabelRestt))';
+stdtt = std(table2array(tabelRestt))';
 lengthtt = length(table2array(tabelRestt))
 tabelRestf =  balanced2LoomRand(cell2mat(resMat.tf(1,:)),logical(minVect(end,:)));
-meantf = mean(table2array(tabelRestf))
-stdtf = std(table2array(tabelRestf))
+meantf = mean(table2array(tabelRestf))';
+stdtf = std(table2array(tabelRestf))';
 lengthtf = length(table2array(tabelRestf))
 tabelResft =  balanced2LoomRand(cell2mat(resMat.ft(1,:)),logical(minVect(end,:)));
-meanft = mean(table2array(tabelResft))
-stdft = std(table2array(tabelResft))
+meanft = mean(table2array(tabelResft))';
+stdft = std(table2array(tabelResft))';
 lengthft = length(table2array(tabelResft))
 tabelResff =  balanced2LoomRand(cell2mat(resMat.ff(1,:)),logical(minVect(end,:)));
-meanff = mean(table2array(tabelResff))
-stdff = std(table2array(tabelResff))
+meanff = mean(table2array(tabelResff))';
+stdff = std(table2array(tabelResff))';
 lengthff = length(table2array(tabelResff))
 
 clear a b
@@ -325,7 +399,7 @@ ylabel('Frequency in Hz');
 xlabel('Time in s')
 c = colorbar;
 c.Label.String = 'Power in dB';
-caxis([-6 6])
+caxis([-7 7])
 xline(6.61, 'LineWidth', 2.5);
 
 clear a b
@@ -356,49 +430,60 @@ ylabel('Frequency in Hz');
 xlabel('Time in s')
 c = colorbar;
 c.Label.String = 'Power in dB';
-caxis([-6 6])
+caxis([-7 7])
+xline(6.61, 'LineWidth', 2.5)
+clear a b
+for i = 1:size(loom{1},2)
+a(:,:,i) = pspectrum(mean(loom{1,1}(:,i),2),500,'spectrogram','TimeResolution',0.85, 'FrequencyLimits',[2 25]);
+end
+for i = 1:size(random{1},2)
+b(:,:,i) = pspectrum(mean(random{1,1}(:,i),2),500,'spectrogram','TimeResolution',0.85, 'FrequencyLimits',[2 25]);
+end
+
+a = cat(2,a, a(:,end,:));
+b = cat(2,b, b(:,end,:));
+
+for flol = 1:size(a,1)
+    for tlol = 1:size(a,2)
+        at(flol,tlol) = ttest2(a(flol,tlol,:),b(flol,tlol,:));
+    end
+end
+figure(17)
+surf(at, 'EdgeColor','none');  
+xlim([0 7])
+axis xy; axis tight; colormap(jet); view(0,90);
+yticks(round([size(at,1)/5:size(at,1)/5:size(at,1)]))
+yticklabels([5 10 15 20 25])
+xticks([1:1:7])
+xticklabels(round([-1.178:0.206:0.058],2))
+ylabel('Frequency in Hz');
+xlabel('Time in s')
 xline(6.61, 'LineWidth', 2.5)
 
-% clear a
-% for i = 1:size(random{1},2)
-% a(:,:,i) = pspectrum(mean(random{1,1}(:,i),2),500,'spectrogram','TimeResolution',0.85, 'FrequencyLimits',[2 25]);
-% end
-% figure(17)
-% a = cat(2,a, a(:,end,:));
-% a = std(a,0,3);
-% a = pow2db(a);
-% surf(a, 'EdgeColor','none');  
-% xlim([0 7])
-% axis xy; axis tight; colormap(jet); view(0,90);
-% yticks(round([size(a,1)/5:size(a,1)/5:size(a,1)]))
-% yticklabels([5 10 15 20 25])
-% xticks([1:1:7])
-% xticklabels(round([-1.178:0.206:0.058],2))
-% colorbar
-% ylabel('Frequency in Hz');
-% xlabel('Time in s')
-% c = colorbar;
-% c.Label.String = 'Power in dB';
-% xline(6.61, 'LineWidth', 2.5)
-% 
-% clear a
-% for i = 1:size(random{2},2)
-% a(:,:,i) = pspectrum(mean(random{1,2}(:,i),2),500,'spectrogram','TimeResolution',0.85, 'FrequencyLimits',[2 25]);
-% end
-% figure(18)
-% a = cat(2,a, a(:,end,:));
-% a = std(a,0,3);
-% a = pow2db(a);
-% surf(a, 'EdgeColor','none');  
-% xlim([0 7])
-% axis xy; axis tight; colormap(jet); view(0,90);
-% yticks(round([size(a,1)/5:size(a,1)/5:size(a,1)]))
-% yticklabels([5 10 15 20 25])
-% xticks([1:1:7])
-% xticklabels(round([-1.178:0.206:0.058],2))
-% colorbar
-% ylabel('Frequency in Hz');
-% xlabel('Time in s')
-% c = colorbar;
-% c.Label.String = 'Power in dB';
-% xline(6.61, 'LineWidth', 2.5)
+clear a b at
+for i = 1:size(loom{2},2)
+a(:,:,i) = pspectrum(mean(loom{1,2}(:,i),2),500,'spectrogram','TimeResolution',0.85, 'FrequencyLimits',[2 25]);
+end
+for i = 1:size(random{2},2)
+b(:,:,i) = pspectrum(mean(random{1,2}(:,i),2),500,'spectrogram','TimeResolution',0.85, 'FrequencyLimits',[2 25]);
+end
+
+a = cat(2,a, a(:,end,:));
+b = cat(2,b, b(:,end,:));
+
+for flol = 1:size(a,1)
+    for tlol = 1:size(a,2)
+        at(flol,tlol) = ttest2(a(flol,tlol,:),b(flol,tlol,:));
+    end
+end
+figure(18)
+surf(at, 'EdgeColor','none');  
+xlim([0 7])
+axis xy; axis tight; colormap(jet); view(0,90);
+yticks(round([size(at,1)/5:size(at,1)/5:size(at,1)]))
+yticklabels([5 10 15 20 25])
+xticks([1:1:7])
+xticklabels(round([-1.178:0.206:0.058],2))
+ylabel('Frequency in Hz');
+xlabel('Time in s')
+xline(6.61, 'LineWidth', 2.5)
