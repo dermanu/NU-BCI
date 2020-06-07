@@ -1,3 +1,5 @@
+%% Calculation of z-value based on FieldTrip
+
 function [reject] = zValue(threshold,dat)
 
 for i = 1:size(dat,1)
