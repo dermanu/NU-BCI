@@ -1,5 +1,5 @@
-%% Cross-subject training using the covariance matrix for LDA Beamforming
-%% Change EpochFolder and feat.peakBeg and feat.peakEnd according to age group - CHANGE ALSO IN FILTERMATRIX
+%% Preprocessing and feature extraction of the data based on the imported spatial pattern
+
 clear all
 close all
 
@@ -11,13 +11,13 @@ switch answer
         epochFolder = 'EpochedData\Katja\1st session';
         epoch       = [-0.600 -1.250];
         thresholdMax   = 200;
-        load('C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Copy_of_2_FeatureExSmooth\FilterMatrix_1st_Session_80.mat')
+        load('C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\FilterMatrix\FilterMatrix_1st_Session_80.mat')
         
     case '2nd'
         epochFolder = 'EpochedData\Katja\2nd session';
         epoch       = [-0.400 -1.250];
         thresholdMax   = 120;
-        load('C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\6_Final_Extraction\FilterMatrix_80_2nd_Session.mat')
+        load('C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\FilterMatrix\FilterMatrix_80_2nd_Session.mat')
         end
 
 mat = dir(strcat('..\', epochFolder,'\*.mat'));
