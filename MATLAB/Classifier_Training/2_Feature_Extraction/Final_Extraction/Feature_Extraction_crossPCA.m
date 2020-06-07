@@ -1,4 +1,4 @@
-%% Preprocessing and feature extraction of the data based on the spatial filter extracted from all subjects.
+%% Preprocessing and feature extraction of the data based on the imported spatial pattern
 
 clear all
 close all
