@@ -1,3 +1,5 @@
+%% Quick replacement of the existing spatial filter (LDA beamformer). Not recommended for future development of the system.
+
 function [filteredData] = diySpatialFilter(P,data)
 
 %% Weighten the Data according to the spatial pattern square

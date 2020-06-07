@@ -1,7 +1,8 @@
+%% Extraction of the spatial pattern based on the EEG trials
+
 function [score, explained] = cross_PCA_filtermatrix(epochFolder, epoch, thresholdMax, channels, ch)
 
 mat = dir(strcat('..\', epochFolder, '\*.mat'));
-mat = mat(1:60);
 looming = [];
 
 for q = 1:length(mat)

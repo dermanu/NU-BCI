@@ -1,3 +1,5 @@
+%% Create interpretable labels for all features 
+
 function [nameArray] = nameing()
 %UNTITLED4 Summary of this function goes here
 %   Detailed explanation goes here

@@ -1,3 +1,5 @@
+% Creates labels for the wavelet features for better discrimination between them.
+
 clear all
 
 mat = dir(strcat('**/', 'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Shared\Wavelet_WaveDecomposition','/*.mat'));

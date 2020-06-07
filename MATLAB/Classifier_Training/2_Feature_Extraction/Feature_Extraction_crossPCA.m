@@ -1,5 +1,5 @@
-%% Cross-subject training using the covariance matrix for LDA Beamforming
-%% Change EpochFolder and feat.peakBeg and feat.peakEnd according to age group - CHANGE ALSO IN FILTERMATRIX
+%% Preprocessing and feature extraction of the data based on the imported spatial pattern
+
 clear all
 close all
 
@@ -8,6 +8,8 @@ answer = questdlg('Choose which session you want to analyse:', ...
     '1st','2nd', '');
 
 train = [];
+
+%% Switch between age groups
 
 switch answer
     case '1st'
@@ -471,7 +473,7 @@ for q = 1:length(mat)
                         timeTmp = [(ceil(cfg.pre.prestim*sampleFreq(DWTFreqLoop))+(ceil(feat.peakEnd*sampleFreq(DWTFreqLoop))))+1 (ceil(cfg.pre.prestim*sampleFreq(DWTFreqLoop))+(ceil(feat.peakBeg*sampleFreq(DWTFreqLoop))))];
                         DWTFreqTemp = DWTFreq{1,DWTFreqLoop};
                         % DWTFreqTemp = DWTFreqTemp(timeTmp(1) : timeTmp(2));
-                        % "..actual lengths of the detail and approximation coefficient vectors are slightly more than half the length of the original signal. This has to do with the filtering process, which is implemented by convolving the signal with a filter. The convolution “smears” the signal, introducing several extra samples into the result
+                        % "..actual lengths of the detail and approximation coefficient vectors are slightly more than half the length of the original signal. This has to do with the filtering process, which is implemented by convolving the signal with a filter. The convolution Â“smearsÂ” the signal, introducing several extra samples into the result
                         
                         DWTmean     = mean(DWTFreqTemp);
                         DWTmedian   = median(DWTFreqTemp);

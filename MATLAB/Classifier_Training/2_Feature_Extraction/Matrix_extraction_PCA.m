@@ -1,3 +1,7 @@
+%% The following code allows for the extraction of the filter matrix based on the training data and saves it. 
+%% The resulting matrix is subsequently used for spatial filtering.
+
+
 clear all
 close all
 
