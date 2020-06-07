@@ -1,8 +1,9 @@
-%% Converts features of v5 training scripts into classfier readable format
+%% Balances the features and subsequently converts it into a for the classifier readable format.
+
 clear all
 close all
 
-folder =  'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Features\Katja\1st_Session\All7';
+folder =  'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Features\Katja\1st_Session\All';
 
 mat = dir(strcat(folder,'\*.mat'));
 
