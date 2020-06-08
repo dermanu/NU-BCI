@@ -35,7 +35,7 @@ cfg.pre.poststim          = 0.500; % 200 ms poststimuls for classifing
 cfg.channel = 'all';    % to 'all' if not working
 cfg.method  = 'trial';
 cfg.trials  = 'all';
-cfg.resampleFs = 500;
+cfg.sampleFs = 500;
 
 %Padding
 cfg.padding = zeros(128, 3000);
@@ -84,13 +84,13 @@ cfg.pre.preDiff  = cfg.trialdef.prestim - cfg.pre.prestim;
 cfg.pre.postDiff = cfg.trialdef.poststim - cfg.pre.poststim;
 
 % Convert into sampels
-feat.offsetSamp      = round(cfg.pre.prestim * cfg.resampleFs);
-cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * cfg.resampleFs);
-cfg.pre.postDiffSamp = round(cfg.pre.postDiff * cfg.resampleFs);
-feat.peakBegSamp     = round(feat.peakBeg * cfg.resampleFs);
-feat.peakEndSamp     = round(feat.peakEnd * cfg.resampleFs);
-cfg.pre.prestimSamp  = round(cfg.pre.prestim * cfg.resampleFs);
-cfg.pre.poststimSamp = round(cfg.pre.poststim * cfg.resampleFs);
+feat.offsetSamp      = round(cfg.pre.prestim * cfg.sampleFs);
+cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * cfg.sampleFs);
+cfg.pre.postDiffSamp = round(cfg.pre.postDiff * cfg.sampleFs);
+feat.peakBegSamp     = round(feat.peakBeg * cfg.sampleFs);
+feat.peakEndSamp     = round(feat.peakEnd * cfg.sampleFs);
+cfg.pre.prestimSamp  = round(cfg.pre.prestim * cfg.sampleFs);
+cfg.pre.poststimSamp = round(cfg.pre.poststim * cfg.sampleFs);
 
 
 % Define event that is writen to BCI2000 (might be chanced to event?)
@@ -174,6 +174,7 @@ cfg.pre.preDiff  = cfg.trialdef.prestim - cfg.pre.prestim;
 cfg.pre.postDiff = cfg.trialdef.poststim - cfg.pre.poststim;
 
 % convert into sampels
+if exist('cfg.resampleFs', 'var')
     feat.offsetSamp      = round(cfg.pre.prestim * cfg.resampleFs);
     cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * cfg.resampleFs);
     cfg.pre.postDiffSamp = round(cfg.pre.postDiff * cfg.resampleFs);
@@ -181,6 +182,16 @@ cfg.pre.postDiff = cfg.trialdef.poststim - cfg.pre.poststim;
     feat.peakEndSamp     = round(feat.peakEnd * cfg.resampleFs);
     cfg.pre.prestimSamp  = round(cfg.pre.prestim * cfg.resampleFs);
     cfg.pre.poststimSamp = round(cfg.pre.poststim * cfg.resampleFs);
+else
+    cfg.resampleFs = hdr.Fs;
+    feat.offsetSamp = round(cfg.pre.prestim * hdr.Fs);
+    cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * hdr.Fs);
+    cfg.pre.postDiffSamp = round(cfg.pre.postDiff * hdr.Fs);
+    feat.peakBegSamp  = round(feat.peakBeg * hdr.Fs);
+    feat.peakEndSamp = round(feat.peakEnd * hdr.Fs);
+    cfg.pre.prestimSamp  = round(cfg.pre.prestim * hdr.Fs);
+    cfg.pre.poststimSamp = round(cfg.pre.poststim * hdr.Fs);
+end
 
 % these are for the data handling
 prevSample = 0;
@@ -249,11 +260,8 @@ while whileState
             % Timing of artifact detection
             tic;
             
-            % Downsample from 1000 Hz to 500Hz
-            dat = downsample(dato',2);
-            
             % Rereferencing data (needed)
-            dat = ft_preproc_rereference(dat', cfg.refchan, cfg.refmethod);
+            dat = ft_preproc_rereference(dato, cfg.refchan, cfg.refmethod);
             
             % Filter data
             procDat = ft_preproc_dftfilter(dat, hdr.Fs, cfg.dftfreq);
@@ -318,7 +326,7 @@ while whileState
                 continue
             end
             
-             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %% Spatial Filtering                                                          %%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -341,7 +349,7 @@ while whileState
             
             spatDatAllERP = spatDatAll(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
             All(1) = median(spatDatAllERP);
-            All(2) = bandpower(spatDatAllERP, cfg.resampleFs, [3 10]);
+            All(2) = bandpower(spatDat, cfg.resampleFs, [3 10]);
             
             [~, All(3), ~, All(4)] = findpeaks(-spatDat, cfg.resampleFs, 'MinPeakWidth', feat.minPeakWidth, 'SortStr', 'descend', 'NPeaks', 1);
             if isempty(All(3))
@@ -378,7 +386,7 @@ while whileState
             All(10) = var(Theta);
             All(11) = median(Alpha);
             All(12) = min(BetaGamma);
-            All(13) = entropy(double(BetaGamma/max(abs(BetaGamma))));
+            All(13) = entropy(DWTFreqTemp/max(abs(DWTFreqTemp)));
             
             %%Occ
             DWTspatDat = [spatDatOcc cfg.padding(1,:)];
@@ -396,7 +404,7 @@ while whileState
             Delta = Delta(2:17);
             BetaGamma = BetaGamma(2:55);
             Occ(3)  = var(Delta);
-            Occ(4)  = entropy(double(BetaGamma/max(abs(BetaGamma))));
+            Occ(4)  = entropy(BetaGamma/max(abs(BetaGamma)));
             
             [c,l] = wavedec(DWTspatDat,6,'sym6');
             [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
@@ -530,7 +538,7 @@ while whileState
             xlim([count-10 count+1])
             drawnow          
             
-            clear All Occ Temp Diff DiffO
+            clear All Occ Temp Diff
         end
     end % of for-loop
     if length(cfg.event) > 25 && strcmp(cfg.event(end).type, 'T') && ~cfg.event(end).value == 1
