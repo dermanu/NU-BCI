@@ -35,9 +35,10 @@ cfg.pre.poststim          = 0.500; % 200 ms poststimuls for classifing
 cfg.channel = 'all';    % to 'all' if not working
 cfg.method  = 'trial';
 cfg.trials  = 'all';
+cfg.sampleFs = 500;
 
 %Padding
-cfg.padding = zeros(size(rawDat,1), 3000);
+cfg.padding = zeros(128, 3000);
 
 % Notch filter
 cfg.dftfilter  = 'yes';
@@ -83,13 +84,13 @@ cfg.pre.preDiff  = cfg.trialdef.prestim - cfg.pre.prestim;
 cfg.pre.postDiff = cfg.trialdef.poststim - cfg.pre.poststim;
 
 % Convert into sampels
-feat.offsetSamp      = round(cfg.pre.prestim * cfg.resampleFs);
-cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * cfg.resampleFs);
-cfg.pre.postDiffSamp = round(cfg.pre.postDiff * cfg.resampleFs);
-feat.peakBegSamp     = round(feat.peakBeg * cfg.resampleFs);
-feat.peakEndSamp     = round(feat.peakEnd * cfg.resampleFs);
-cfg.pre.prestimSamp  = round(cfg.pre.prestim * cfg.resampleFs);
-cfg.pre.poststimSamp = round(cfg.pre.poststim * cfg.resampleFs);
+feat.offsetSamp      = round(cfg.pre.prestim * cfg.sampleFs);
+cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * cfg.sampleFs);
+cfg.pre.postDiffSamp = round(cfg.pre.postDiff * cfg.sampleFs);
+feat.peakBegSamp     = round(feat.peakBeg * cfg.sampleFs);
+feat.peakEndSamp     = round(feat.peakEnd * cfg.sampleFs);
+cfg.pre.prestimSamp  = round(cfg.pre.prestim * cfg.sampleFs);
+cfg.pre.poststimSamp = round(cfg.pre.poststim * cfg.sampleFs);
 
 
 % Define event that is writen to BCI2000 (might be chanced to event?)
@@ -201,6 +202,8 @@ whileState = true;
 % Set timer variables
 tRead(1)     = 0;
 tArti(1)     = 0;
+tFeat(1)     = 0;
+tClass(1)    = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% this is the general BCI loop where realtime incoming data is handled       %%
@@ -309,6 +312,15 @@ while whileState
             tArti(end+1) = toc * 1000;
             fprintf('Artifact detection of last trail took %5.2f ms.\n', tArti(end));
             
+            figure(1);
+            yNames = {' ', 'Artifact (Thres/Z)', 'Artifact (Z-value)', 'Artifact (Threshold)', 'No loom detected', 'Loom detected', ' '};
+            plot(plotCount,plotValue, 'Marker', '*', 'LineStyle', 'none')
+            set(gca,'ytick', (-4):2, 'yticklabel', yNames, 'YAxisLocation','right');
+            xlabel('Trial number');
+            ylim([-4 2])
+            xlim([count-10 count+1])
+            drawnow          
+            
             if nnz(doc.threshold(count,:)) > cfg.costumRej.badElcRej || any(doc.zScore(count,1))   %% if more then 9 channels are bad, then reject
                 fprintf('Recjected trial %d from sample %d to %d due to artifacts.\n', count, begsample, endsample);
                 continue
@@ -326,6 +338,8 @@ while whileState
             %% Feature extraction
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%All
+            tic;
+            
             DWTspatDat = [spatDatAll cfg.padding(1,:)];
             
             [c,l] = wavedec(DWTspatDat,6,'bior2.2');
@@ -372,7 +386,7 @@ while whileState
             spatDatFilt  = ft_preproc_bandpassfilter(spatDatOcc, cfg.resampleFs, [3 7], cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
             phaseDatStim = hilbert(spatDatOcc);
             phaseDatStim = angle(spatDatOcc);
-            phaseDatRef = spatDatAll(feat.refCh,:);
+            phaseDatRef = procDat(feat.refCh,:);
             phaseDatRef = exp(1j*phaseDatRef);
             phaseDatRef = mean(phaseDatRef,1);
             phaseDatRef = angle(phaseDatRef);
@@ -391,7 +405,7 @@ while whileState
             Occ(8)  = median(Alpha);
             Occ(9)  = min(Alpha);
             Occ(10) = max(Alpha);
-            Occ(11) = entropy(Alpha/max(abs(Alpha)));
+            Occ(11) = entropy(double(Alpha/max(abs(Alpha))));
             
             [c,l] = wavedec(DWTspatDat,6,'bior4.4');
             Delta = appcoef(c,l,'bior2.2');
@@ -449,8 +463,8 @@ while whileState
             [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
             Theta = Theta(2:16);
             BetaGamma = BetaGamma(2:55);
-            Temp(9)  = entropy(Theta/max(abs(Theta)));
-            Temp(10)  = entropy(BetaGamma/max(abs(BetaGamma)));
+            Temp(9)   = entropy(double(Theta/max(abs(Theta))));
+            Temp(10)  = entropy(double(BetaGamma/max(abs(BetaGamma))));
             
             %%Difference
 
@@ -477,20 +491,28 @@ while whileState
             Diff(4) = Occ(17) - Diff(4);
             
             features = [All Occ Temp Diff];
+            
+            tFeat(end+1) = toc * 1000;
+            fprintf('Feature extraction of last trail took %5.2f ms.\n', tFeat(end));
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Classification
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
             %%LDA classifier
+            tic;
+            
             [lable, ~] = predict(classificationDiscriminant, features);
             
             if lable == 1
                 plotValue(count) = 1;
                 ft_write_event(cfg.dataset, event_detected);  
             elseif lable == 3
-                plotValue(count) = 2;
+                plotValue(count) = 0;
                 ft_write_event(cfg.dataset, event_notDetected);   
             end
+            
+            tClass(end+1) = toc * 1000;
+            fprintf('Classification of last trail took %5.2f ms.\n', tClass(end));
                         
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %% from here documentation and plotting                                       %%
