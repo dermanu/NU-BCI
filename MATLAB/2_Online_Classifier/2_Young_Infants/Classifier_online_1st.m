@@ -509,10 +509,10 @@ while whileState
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Classification
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            %%LDA classifier
+            %%SVM classifier
             tic;
             
-            [lable, ~] = predict(classificationDiscriminant, features);
+            [lable, ~] = predict(classificationSVM, features);
             
             if lable == 1
                 plotValue(count) = 1;
