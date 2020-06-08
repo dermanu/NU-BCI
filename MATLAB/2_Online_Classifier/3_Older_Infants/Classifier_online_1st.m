@@ -57,7 +57,7 @@ cfg.refmethod = 'avg';
 cfg.refchan = 'all';
 
 % Artifact correction based on threshold in uV
-cfg.costumRej.artfMax = 1.200;
+cfg.costumRej.artfMax = 120;
 cfg.costumRej.artfMin = 0.001;
 
 % Artifact correction based on z-value
@@ -71,7 +71,7 @@ beam = [];
 feat = [];
 feat.nulling       = 0.40;
 feat.refCh         = [41:49 53 54]; %
-feat.peakBeg       = -0.600; % Set to 12 month old infants ERP
+feat.peakBeg       = -0.400; % Set to 12 month old infants ERP
 feat.peakEnd       = -1.250;
 feat.fractionalLat = 50; % fractional area latency in percent
 feat.fractionalOn  = 25;
@@ -453,8 +453,7 @@ while whileState
             Temp(10)  = entropy(BetaGamma/max(abs(BetaGamma)));
             
             %%Difference
-            DWTspatDat = [spatDatTemp cfg.padding(1,:)];
-            
+
             [c,l] = wavedec(DWTspatDat,6,'bior2.2');
             [~,Alpha,~] = detcoef(c,l,[4 5 6]);
             Alpha = Alpha(2:29);
@@ -506,6 +505,7 @@ while whileState
             xlim([count-10 count+1])
             drawnow          
             
+            clear All Occ Temp Diff
         end
     end % of for-loop
     if length(cfg.event) > 25 && strcmp(cfg.event(end).type, 'T') && ~cfg.event(end).value == 1

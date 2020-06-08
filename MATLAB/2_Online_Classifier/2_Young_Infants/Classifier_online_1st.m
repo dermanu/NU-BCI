@@ -57,7 +57,7 @@ cfg.refmethod = 'avg';
 cfg.refchan = 'all';
 
 % Artifact correction based on threshold in uV
-cfg.costumRej.artfMax = 1.200;
+cfg.costumRej.artfMax = 200;
 cfg.costumRej.artfMin = 0.001;
 
 % Artifact correction based on z-value
@@ -320,162 +320,170 @@ while whileState
             
             spatDatAll = diySpatialFilter(train.score{1,1}, procDat(1:128,:));
             spatDatOcc = diySpatialFilter(train.score{1,2}, procDat(62:102,:));
-            spatDatTemp = diySpatialFilter(train.score{1,3}, procDat(30:62,:));
+            spatDatTemp = diySpatialFilter(train.score{1,3}, procDat([41:49 53 54],:));
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %% Feature extraction
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%All
+            
+            spatDatAllERP = spatDatAll(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
+            All(1) = median(spatDatAllERP);
+            All(2) = bandpower(spatDat, cfg.resampleFs, [3 10]);
+            
+            [~, All(3), ~, All(4)] = findpeaks(-spatDat, cfg.resampleFs, 'MinPeakWidth', feat.minPeakWidth, 'SortStr', 'descend', 'NPeaks', 1);
+            if isempty(All(3))
+                [~, All(3), ~, All(4)] = findpeaks(-spatDat, cfg.resampleFs, 'SortStr', 'descend', 'NPeaks', 1);
+            end
+            if isempty(All(3))
+                All(3)  = 0;
+                All(4) = 0;
+            end 
+            
             DWTspatDat = [spatDatAll cfg.padding(1,:)];
             
             [c,l] = wavedec(DWTspatDat,6,'bior2.2');
-            Delta = appcoef(c,l,'bior2.2');
+            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            Alpha = Alpha(2:29);            
+            All(5) = min(Theta);
+            All(6) = min(Alpha);
+            
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [BetaGamma,~,~] = detcoef(c,l,[4 5 6]);
+            BetaGamma = BetaGamma(2:55);
+            All(7) = (1/size(BetaGamma,2)) * sum(((BetaGamma-mean(BetaGamma)) ./ std(BetaGamma)).^4-3);
+
+            [c,l] = wavedec(DWTspatDat,6,'db4');
+            Delta = appcoef(c,l,'db4');
+            [BetaGamma,Alpha,Theta] = detcoef(c,l,[4 5 6]);
             Delta = Delta(2:17);
-            All(1)      = min(Delta);
-            All(2)    = (1/size(Delta,2)) * sum(Delta).^2;
+            BetaGamma = BetaGamma(2:55);
+            Alpha = Alpha(2:29);  
+            Theta = Theta(2:16);
+            All(8)  = median(Delta);
+            All(9)  = (1/size(Delta,2)) * sum(Delta).^2;
+            All(10) = var(Theta);
+            All(11) = median(Alpha);
+            All(12) = min(BetaGamma);
+            All(13) = entropy(DWTFreqTemp/max(abs(DWTFreqTemp)));
+            
+            %%Occ
+            DWTspatDat = [spatDatOcc cfg.padding(1,:)];
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior2.2');
+            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            Alpha = Alpha(2:29);            
+            Occ(1) = (1/size(Theta,2)) * sum(Theta).^2;);
+            Occ(2) = (1/size(Alpha,2)) * sum(((Alpha-mean(Alpha)) ./ std(Alpha)).^4-3);
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior4.4');
+            Delta = appcoef(c,l,'bior4.4');
+            [BetaGamma,~,~] = detcoef(c,l,[4 5 6]);
+            Delta = Delta(2:17);
+            BetaGamma = BetaGamma(2:55);
+            Occ(3)  = var(Delta);
+            Occ(4)  = entropy(BetaGamma/max(abs(BetaGamma)));
+            
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            BetaGamma = BetaGamma(2:55);
+            Occ(5)  = mean(Theta);
+            Occ(6)  = mean(BetaGamma);
+            
+            
+            %% Temporal
+            spatDatTempERP = spatDatTemp(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
+            Temp(1) = std(spatDatTempERP);
+            Temp(2) = max(spatDatTempERP);
+            
+            spatDatFilt  = ft_preproc_bandpassfilter(spatDatTemp, cfg.resampleFs, [3 7], cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
+            phaseDatStim = hilbert(spatDatTemp);
+            phaseDatStim = angle(spatDatTemp);
+            phaseDatRef = spatDatAll(feat.refCh,:);
+            phaseDatRef = exp(1j*phaseDatRef);
+            phaseDatRef = mean(phaseDatRef,1);
+            phaseDatRef = angle(phaseDatRef);
+            Temp(3) = std(phaseDatStim - phaseDatRef);
+            
+            DWTspatDat = [spatDatTemp cfg.padding(1,:)];
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior2.2');
+            Delta = appcoef(c,l,'bior2.2');
+            [BetaGamma,Alpha,~] = detcoef(c,l,[4 5 6]);
+            Delta = Delta(2:17);
+            Alpha = Alpha(2:29);
+            BetaGamma = BetaGamma(2:55);
+            Temp(4) = mean(Delta);
+            Temp(5) = min(Alpha);
+            Temp(6) = max(BetaGamma);
             
             [c,l] = wavedec(DWTspatDat,6,'bior4.4');
             Delta = appcoef(c,l,'bior4.4');
             [~,~,Theta] = detcoef(c,l,[4 5 6]);
             Delta = Delta(2:17);
             Theta = Theta(2:16);
-            All(3)  = (1/size(Delta,2)) * sum(Delta).^2;
-            All(4)  = mean(Theta);
-            All(5)  = min(Theta);
-            
-            [c,l] = wavedec(DWTspatDat,6,'sym6');
-            [~,~,Theta] = detcoef(c,l,[4 5 6]);
-            Theta = Theta(2:16);
-            All(6)  = median(Theta);
+            Temp(7) = min(Delta);
+            Temp(8) = median(Theta);
             
             [c,l] = wavedec(DWTspatDat,6,'db4');
-            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
+            Alpha = Alpha(2:29);
             Theta = Theta(2:16);
-            All(7)  = median(Theta);
-            All(8)  = (1/size(Theta,2)) * sum(Theta).^2;
-            
-            %%Occ
-            spatDatOccERP = spatDatOcc(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
-            
-            Occ(1)  = rms(spatDatOccERP);
-            Occ(2) = length(find([0 diff(sign(spatDatOccERP))]~=0));
-            Occ(3) = (max(spatDatOccERP) - min(spatDatOccERP)) / std(spatDatOccERP);
-            
-            [~, ~, ~, Occ(4)] = findpeaks(-spatDatOcc, cfg.resampleFs, 'MinPeakWidth', feat.minPeakWidth, 'SortStr', 'descend', 'NPeaks', 1);
-            if isempty(Occ(4))
-                [~, ~, ~, Occ(4)] = findpeaks(-spatDatOcc, cfg.resampleFs, 'SortStr', 'descend', 'NPeaks', 1);
-            end
-            if isempty(Occ(4))
-                Occ(4) = 0;
-            end
-            
-            spatDatFilt  = ft_preproc_bandpassfilter(spatDatOcc, cfg.resampleFs, [3 7], cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
-            phaseDatStim = hilbert(spatDatOcc);
-            phaseDatStim = angle(spatDatOcc);
-            phaseDatRef = spatDatAll(feat.refCh,:);
-            phaseDatRef = exp(1j*phaseDatRef);
-            phaseDatRef = mean(phaseDatRef,1);
-            phaseDatRef = angle(phaseDatRef);
-            Occ(5) = std(phaseDatStim - phaseDatRef);
-            
+            Temp(9) = min(Theta);
+            Temp(10) = (1/size(Alpha,2)) * sum(((Alpha-mean(Alpha)) ./ std(Alpha)).^4-3);
+
+            %Difference
             DWTspatDat = [spatDatOcc cfg.padding(1,:)];
             
-            [c,l] = wavedec(DWTspatDat,6,'bior2.2');
-            Delta = appcoef(c,l,'bior2.2');
-            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
-            Delta = Delta(2:17);
-            Theta = Theta(2:16);
-            Alpha = Alpha(2:29);
-            Occ(6)  = max(Delta);
-            Occ(7)  = var(Theta);
-            Occ(8)  = median(Alpha);
-            Occ(9)  = min(Alpha);
-            Occ(10) = max(Alpha);
-            Occ(11) = entropy(Alpha/max(abs(Alpha)));
-            
             [c,l] = wavedec(DWTspatDat,6,'bior4.4');
-            Delta = appcoef(c,l,'bior2.2');
-            Delta = Delta(2:17);
-            Occ(12) = max(Delta);
-            
+            [BetaGamma,~,~] = detcoef(c,l,[4 5 6]);
+            BetaGamma = BetaGamma(2:55);
+            DiffO(1) = mean(BetaGamma);
+           
             [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            DiffO(2) = (1/size(Theta,2)) * sum(Theta).^2;
+            
+            [c,l] = wavedec(DWTspatDat,6,'db4');
             [BetaGamma,Alpha,~] = detcoef(c,l,[4 5 6]);
             BetaGamma = BetaGamma(2:55);
             Alpha = Alpha(2:29);
-            Occ(13) = (1/size(Alpha,2)) * sum(((Alpha-mean(Alpha)) ./ std(Alpha)).^4-3);
-            Occ(14) = min(BetaGamma);
+            DiffO(3) = min(Alpha);
+            DiffO(4) = median(BetaGamma);
             
-            [c,l] = wavedec(DWTspatDat,6,'db4');
-            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
-            Alpha = Alpha(2:29);
-            Theta = Theta(2:16);
-            Occ(15)   = var(Theta);
-            Occ(16) = (1/size(Theta,2)) * sum(Theta).^2;
-            Occ(17)  = mean(Alpha);
-            
-            %% Temporal
-            spatDatTempERP = spatDatTemp(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
-            
-            Temp(1) = max(spatDatTempERP)
-            
-            [~, Temp(2), ~, ~] = findpeaks(-spatDatTemp, cfg.resampleFs, 'MinPeakWidth', feat.minPeakWidth, 'SortStr', 'descend', 'NPeaks', 1);
-            if isempty(Temp(2))
-                [~, Temp(2), ~, ~] = findpeaks(-spatDatTemp, cfg.resampleFs, 'SortStr', 'descend', 'NPeaks', 1);
-            end
-            if isempty(Temp(2))
-                Temp(2)  = 0;
-            end
-            
-            DWTspatDat = [spatDatTemp cfg.padding(1,:)];
-            
-            [c,l] = wavedec(DWTspatDat,6,'bior4.4');
-            [BetaGamma,Alpha,Theta] = detcoef(c,l,[4 5 6]);
-            Theta = Theta(2:16);
-            Alpha = Alpha(2:29);
-            BetaGamma = BetaGamma(2:55);
-            Temp(3) = median(Theta);
-            Temp(4) = min(Alpha);
-            Temp(5) = max(Alpha);
-            Temp(6) = (1/size(BetaGamma,2)) * sum(((BetaGamma-mean(BetaGamma)) ./ std(BetaGamma)).^4-3);
-            
-            [c,l] = wavedec(DWTspatDat,6,'sym6');
-            [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
-            Theta = Theta(2:16);
-            BetaGamma = BetaGamma(2:55);
-            Temp(7) = min(Theta);
-            Temp(8) = mean(BetaGamma);
-            
-            [c,l] = wavedec(DWTspatDat,6,'db4');
-            [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
-            Theta = Theta(2:16);
-            BetaGamma = BetaGamma(2:55);
-            Temp(9)  = entropy(Theta/max(abs(Theta)));
-            Temp(10)  = entropy(BetaGamma/max(abs(BetaGamma)));
-            
-            %%Difference
             DWTspatDat = [spatDatTemp cfg.padding(1,:)];
             
             [c,l] = wavedec(DWTspatDat,6,'bior2.2');
-            [~,Alpha,~] = detcoef(c,l,[4 5 6]);
-            Alpha = Alpha(2:29);
-            Diff(1) = min(Alpha);
+            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            Diff(1) = (1/size(Theta,2)) * sum(Theta).^2;
             
-            [c,l] = wavedec(DWTspatDat,6,'sym6');
-            [BetaGamma,Alpha,~] = detcoef(c,l,[4 5 6]);
-            Alpha = Alpha(2:29);
+            [c,l] = wavedec(DWTspatDat,6,'bior4.4');
+            [BetaGamma,~,~] = detcoef(c,l,[4 5 6]);
             BetaGamma = BetaGamma(2:55);
-            Diff(2) = (1/size(Alpha,2)) * sum(((Alpha-mean(Alpha)) ./ std(Alpha)).^4-3);
-            Diff(3) = min(BetaGamma);
+            Diff(2) = mean(BetaGamma);
+           
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            Diff(3) = (1/size(Theta,2)) * sum(Theta).^2;
             
             [c,l] = wavedec(DWTspatDat,6,'db4');
-            [~,Alpha,~] = detcoef(c,l,[4 5 6]);
+            [BetaGamma,Alpha,~] = detcoef(c,l,[4 5 6]);
+            BetaGamma = BetaGamma(2:55);
             Alpha = Alpha(2:29);
-            Diff(4) = mean(Alpha);
+            Diff(4) = min(Alpha);
+            Diff(5) = median(BetaGamma);
             
-            Diff(1) = Occ(9)  - Diff(1);
-            Diff(2) = Occ(13) - Diff(2);
-            Diff(3) = Occ(14) - Diff(3);
-            Diff(4) = Occ(17) - Diff(4);
+            Diff(1) = Occ(1)   - Diff(1);
+            Diff(2) = DiffO(1) - Diff(2);
+            Diff(3) = DiffO(2) - Diff(3);
+            Diff(4) = DiffO(3) - Diff(4);
+            Diff(5) = DiffO(4) - Diff(5);
             
             features = [All Occ Temp Diff];
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -504,9 +512,11 @@ while whileState
             xlabel('Trial number');
             ylim([-4 2])
             xlim([count-10 count+1])
-            drawnow          
+            drawnow   
             
+          clear All Occ Temp Diff DiffO
         end
+        
     end % of for-loop
     if length(cfg.event) > 25 && strcmp(cfg.event(end).type, 'T') && ~cfg.event(end).value == 1
         ft_flush_event(cfg.dataset);
