@@ -492,8 +492,7 @@ while whileState
                 plotValue(count) = 2;
                 ft_write_event(cfg.dataset, event_notDetected);   
             end
-            
-            
+                        
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %% from here documentation and plotting                                       %%
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

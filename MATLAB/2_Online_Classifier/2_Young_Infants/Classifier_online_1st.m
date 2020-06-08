@@ -4,8 +4,11 @@ close all;
 addpath C:\Users\NU-BCI\Documents\MATLAB\fieldtrip
 ft_defaults
 
+load('FilterMatrix.mat');
+load('Classifier_Trained.mat');
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Set all parameter and default configuration settings
+%% Set all parameter and default configuration settings                       %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Stream settings
@@ -19,23 +22,22 @@ doc = [];
 pre = [];
 
 %trail settings
-cfg.trialfun              = 'ft_trialfun_nubci_online'; 
+cfg.trialfun              = 'ft_trialfun_nubci_online';
 
 cfg.trialdef.eventtype    = 'T';
 cfg.trialdef.eventvalue   = 1;
-cfg.trialdef.prestim      = 1.500; % 1500 ms prestimuls for filtering (add 500 ms to assure good filtering)
+cfg.trialdef.prestim      = 2.000; % 2000 ms prestimuls for filtering (add 500 ms to assure good filtering)
 cfg.trialdef.poststim     = 0.500; % 500 ms poststimulus for filtering (add 500 ms to assure good filtering)
-cfg.pre.prestim           = 1.200; % 1200 ms prestimuls for classifing 
+cfg.pre.prestim           = 1.500; % 1200 ms prestimuls for classifing
 cfg.pre.poststim          = 0.500; % 200 ms poststimuls for classifing
 
-% Filter general setup 
+% Filter general setup
 cfg.channel = 'all';    % to 'all' if not working
 cfg.method  = 'trial';
 cfg.trials  = 'all';
 
-% Resmaple data
-%cfg.resampleFs      = 500;
-%cfg.resampleMethod  = 'resample';
+%Padding
+cfg.padding = zeros(size(rawDat,1), 3000);
 
 % Notch filter
 cfg.dftfilter  = 'yes';
@@ -44,7 +46,7 @@ cfg.dftreplace = 'zero';
 
 % Bandpass filter
 cfg.bpfilter       = 'yes';
-cfg.bpfreq         = [3 20];
+cfg.bpfreq         = [1.8 25];
 cfg.bpfiltord      = 4;
 cfg.bpfilttype     = 'but';
 cfg.bpfiltdir      = 'twopass';
@@ -59,20 +61,36 @@ cfg.costumRej.artfMax = 1.200;
 cfg.costumRej.artfMin = 0.001;
 
 % Artifact correction based on z-value
-cfg.costumRej.zThreshold = 10; % see fieldtrip for values
-cfg.costumRej.badElcRej  = 13; % if more then 10% of electrodes are bad reject trial 
+cfg.costumRej.zThreshold = 19; % see fieldtrip for values
+cfg.costumRej.badElcRej  = 13; % if more then 10% of electrodes are bad reject trial
 
 % Settings LDA beamformer
 beam = [];
 
 % Setting feature extraction
 feat = [];
-feat.refCh         = [41:49 53 54]; % ?
-feat.peakBeg       = -0.450; % Set to 12 month old infants ERP
-feat.peakEnd       = -0.850;
+feat.nulling       = 0.40;
+feat.refCh         = [41:49 53 54]; %
+feat.peakBeg       = -0.600; % Set to 12 month old infants ERP
+feat.peakEnd       = -1.250;
 feat.fractionalLat = 50; % fractional area latency in percent
 feat.fractionalOn  = 25;
 feat.fractionalOff = 75;
+feat.minPeakWidth  = 0.11;
+
+% Define pre and postimulus cut
+cfg.pre.preDiff  = cfg.trialdef.prestim - cfg.pre.prestim;
+cfg.pre.postDiff = cfg.trialdef.poststim - cfg.pre.poststim;
+
+% Convert into sampels
+feat.offsetSamp      = round(cfg.pre.prestim * cfg.resampleFs);
+cfg.pre.preDiffSamp  = round(cfg.pre.preDiff * cfg.resampleFs);
+cfg.pre.postDiffSamp = round(cfg.pre.postDiff * cfg.resampleFs);
+feat.peakBegSamp     = round(feat.peakBeg * cfg.resampleFs);
+feat.peakEndSamp     = round(feat.peakEnd * cfg.resampleFs);
+cfg.pre.prestimSamp  = round(cfg.pre.prestim * cfg.resampleFs);
+cfg.pre.poststimSamp = round(cfg.pre.poststim * cfg.resampleFs);
+
 
 % Define event that is writen to BCI2000 (might be chanced to event?)
 % event_Result send information about the artifact correction a
@@ -114,7 +132,7 @@ if ~isfield(cfg, 'channel'),        cfg.channel = 'all';      end % channels are
 if ~isfield(cfg, 'bufferdata'),     cfg.bufferdata = 'last';  end % first or last
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Check connection with BCI2000
+%% Check connection with BCI2000                                              %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Tell BCI2000 that Matlab is ready
 ft_write_event(cfg.dataset, event_matlabReady);
@@ -127,15 +145,15 @@ while isempty(cfg.event)
     cfg.event = ft_read_event(cfg.dataset);
     continue;
 end
- while ~(strcmp(cfg.event(end).type,'R') && cfg.event(end).value == 1)
-     % Wait until BCI2000 is ready. The eventtype might have to be defined 
-     cfg.event = ft_read_event(cfg.dataset);
-     continue;
- end
+while ~(strcmp(cfg.event(end).type,'R') && cfg.event(end).value == 1)
+    % Wait until BCI2000 is ready. The eventtype might have to be defined
+    cfg.event = ft_read_event(cfg.dataset);
+    continue;
+end
 fprintf('Ready\n');
- 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Read header and set parameters according to read out
+%% Read header and set parameters according to read out                       %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % translate dataset into datafile+headerfile
 cfg = ft_checkconfig(cfg, 'dataset2files', 'yes');
@@ -178,263 +196,322 @@ end
 prevSample = 0;
 count      = 0;
 soldevent  = 0;
-whileState = true; 
+whileState = true;
 
 % Set timer variables
 tRead(1)     = 0;
 tArti(1)     = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% this is the general BCI loop where realtime incoming data is handled
+%% this is the general BCI loop where realtime incoming data is handled       %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-while whileState 
-  % determine latest header and event information
-  cfg.event = ft_read_event(cfg.dataset);
-  cfg.hdr = hdr;
-  
-  % lets the loop run until the stimulus presentation is ended
-  if ~isempty(cfg.event)
-    whileState = ~(strcmp(cfg.event(end).type,'R') && cfg.event(end).value == 0);
-  end 
-  
-  % evaluate the trialfun, note that the trialfun should not re-read the events and header
-  [trl, trlname, soldevent] = feval(cfg.trialfun, cfg, soldevent); 
-  
-  if isempty(trl)
-      % Skips the loop until a trial is detected
-      continue;
-  else
-      fprintf('Trail detected and processed.\n')
-  end
- 
-  %start timer for read speed 
- for trllop=1:size(trl,1)  %go through all trails in the buffer   
-   if ~isempty(trl)
-    begsample = trl(trllop,1);
-    endsample = trl(trllop,2);
-    offset    = trl(trllop,3);
-    trl = [];
+while whileState
+    % determine latest header and event information
+    cfg.event = ft_read_event(cfg.dataset);
+    cfg.hdr = hdr;
     
-    % remember up to where the data was read
-    prevSample  = endsample;
-    count       = count + 1;
-    plotCount(count) = count;
-    fprintf('Processing segment %d from sample %d to %d\n', count, begsample, endsample);
+    % lets the loop run until the stimulus presentation is ended
+    if ~isempty(cfg.event)
+        whileState = ~(strcmp(cfg.event(end).type,'R') && cfg.event(end).value == 0);
+    end
     
-    % Give buffer to get post-stimulus samples
-    pause(cfg.trialdef.poststim)
+    % evaluate the trialfun, note that the trialfun should not re-read the events and header
+    [trl, trlname, soldevent] = feval(cfg.trialfun, cfg, soldevent);
     
-    % Timing of reading data
-    tic;
+    if isempty(trl)
+        % Skips the loop until a trial is detected
+        continue;
+    else
+        fprintf('Trail detected and processed.\n')
+    end
     
-    % read data segment from buffer
-    dato = ft_read_data(cfg.dataset, 'header', cfg.hdr, 'begsample', begsample, 'endsample', endsample, 'chanindx', chanindx, 'checkboundary', true);
-
-    % keep track of the read timing
-    tRead(end+1) = toc * 1000;
-    fprintf('Read of last trail took %5.2f ms.\n', tRead(end));
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %% from here onward it is specific to the preprocessing of the data
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % Feature ideas:
-    %   * Use Multiscale Principal Component Analysis (MSPCA) for denoising
-    %     instead of filtering
-    %   * Use PCA/ICA to exclude artifacts       
-    %   * Use EOG electrodes to exclude artifacts
-    %   * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4105585/
-    %
-    
-    % Timing of artifact detection
-    tic;
-    
-    % Resampling data for better performance (filter properties?)
-      %dat = ft_preproc_resample(dat, hdr.Fs, cfg.resampleFs, cfg.resampleMethod);
-      %hdr.Fs = cfg.resampleFs;
-      
-    % Rereferencing data (needed)
-      dat = ft_preproc_rereference(dato, cfg.refchan, cfg.refmethod);
-
-    % Filter data
-      procDat = ft_preproc_dftfilter(dat, hdr.Fs, cfg.dftfreq); 
-      procDat = ft_preproc_bandpassfilter(procDat, hdr.Fs, cfg.bpfreq, cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
-      
-    % Cut data
-      procDat = procDat(:, cfg.pre.preDiffSamp : end-cfg.pre.postDiffSamp);
-     
-    % Baseline correction  
-      procDat = ft_preproc_baselinecorrect(procDat, cfg.pre.prestimSamp, cfg.pre.prestimSamp+cfg.pre.poststimSamp);
-         
-    % Artifact rejection based on maximum and minimum threshold. 
-    for i = 1:size(procDat,1)
-        % looks for 3 or more consecutive samples bellow the minimum threshold
-        idx = abs(procDat(i,:)) < cfg.costumRej.artfMin;
-        lowBeg = strfind([0 idx 0],[0 1]);
-        lowEnd = strfind([0 idx 0],[1 0])-1;
-        low = (lowEnd-lowBeg+1) >= 3;
-        
-        if any(abs(procDat(i,:)) > cfg.costumRej.artfMax) || any(low)
-            doc.threshold(count,i) = 1; %%Trailstate saves if a trial and channel was ignored or not
-        else
-            doc.threshold(count,i) = 0;
+    for trllop=1:size(trl,1)  %go through all trails in the buffer
+        if ~isempty(trl)
+            begsample = trl(trllop,1);
+            endsample = trl(trllop,2);
+            offset    = trl(trllop,3);
+            trl = [];
+            
+            % remember up to where the data was read
+            prevSample  = endsample;
+            count       = count + 1;
+            plotCount(count) = count;
+            fprintf('Processing segment %d from sample %d to %d\n', count, begsample, endsample);
+            
+            % Give buffer to get post-stimulus samples
+            pause(cfg.trialdef.poststim)
+            
+            % Timing of reading data
+            tic;
+            
+            % read data segment from buffer
+            dato = ft_read_data(cfg.dataset, 'header', cfg.hdr, 'begsample', begsample, 'endsample', endsample, 'chanindx', chanindx, 'checkboundary', true);
+            
+            % keep track of the read timing
+            tRead(end+1) = toc * 1000;
+            fprintf('Read of last trail took %5.2f ms.\n', tRead(end));
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %% from here onward it is specific to the preprocessing of the data           %%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % Timing of artifact detection
+            tic;
+            
+            % Rereferencing data (needed)
+            dat = ft_preproc_rereference(dato, cfg.refchan, cfg.refmethod);
+            
+            % Filter data
+            procDat = ft_preproc_dftfilter(dat, hdr.Fs, cfg.dftfreq);
+            procDat = ft_preproc_bandpassfilter(procDat, hdr.Fs, cfg.bpfreq, cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
+            
+            % Cut data
+            procDat = procDat(:, cfg.pre.preDiffSamp : end-cfg.pre.postDiffSamp);
+            
+            % Baseline correction
+            procDat = ft_preproc_baselinecorrect(procDat, cfg.pre.prestimSamp, cfg.pre.prestimSamp+cfg.pre.poststimSamp);
+            
+            % Artifact rejection based on maximum and minimum threshold.
+            for i = 1:size(procDat,1)
+                % looks for 3 or more consecutive samples bellow the minimum threshold
+                idx = abs(procDat(i,:)) < cfg.costumRej.artfMin;
+                lowBeg = strfind([0 idx 0],[0 1]);
+                lowEnd = strfind([0 idx 0],[1 0])-1;
+                low = (lowEnd-lowBeg+1) >= 3;
+                
+                if any(abs(procDat(i,:)) > cfg.costumRej.artfMax) || any(low)
+                    doc.threshold(count,i) = 1; %%Trailstate saves if a trial and channel was ignored or not
+                else
+                    doc.threshold(count,i) = 0;
+                end
+            end
+            
+            % Artifact rejection based on z-transformed data
+            doc.zScore(count,1) = zValue(cfg.costumRej.zThreshold, procDat);
+            
+            % Documentation and output of artifact rejection results
+            if nnz(doc.threshold(count,:)) > cfg.costumRej.badElcRej && any(doc.zScore(count,1))
+                plotValue(count) = -3;
+                event_artifact.sample = endsample + 1;
+                ft_write_event(cfg.dataset, event_artifact);
+            elseif any(doc.threshold(count,:))
+                plotValue(count) = -1;
+                event_threshold.sample = endsample + 1;
+                ft_write_event(cfg.dataset, event_threshold);
+            elseif any(doc.zScore(count,1))
+                plotValue(count) = -2;
+                event_zScore.sample = endsample + 1;
+                ft_write_event(cfg.dataset, event_zScore);
+            else
+                plotValue(count) = 0;
+            end
+            
+            % keep artifact detection of the read timing
+            tArti(end+1) = toc * 1000;
+            fprintf('Artifact detection of last trail took %5.2f ms.\n', tArti(end));
+            
+            if nnz(doc.threshold(count,:)) > cfg.costumRej.badElcRej || any(doc.zScore(count,1))   %% if more then 9 channels are bad, then reject
+                fprintf('Recjected trial %d from sample %d to %d due to artifacts.\n', count, begsample, endsample);
+                continue
+            end
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %% Spatial Filtering                                                          %%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            spatDatAll = diySpatialFilter(train.score{1,1}, procDat(1:128,:));
+            spatDatOcc = diySpatialFilter(train.score{1,2}, procDat(62:102,:));
+            spatDatTemp = diySpatialFilter(train.score{1,3}, procDat(30:62,:));
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %% Feature extraction
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%All
+            DWTspatDat = [spatDatAll cfg.padding(1,:)];
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior2.2');
+            Delta = appcoef(c,l,'bior2.2');
+            Delta = Delta(2:17);
+            All(1)      = min(Delta);
+            All(2)    = (1/size(Delta,2)) * sum(Delta).^2;
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior4.4');
+            Delta = appcoef(c,l,'bior4.4');
+            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            Delta = Delta(2:17);
+            Theta = Theta(2:16);
+            All(3)  = (1/size(Delta,2)) * sum(Delta).^2;
+            All(4)  = mean(Theta);
+            All(5)  = min(Theta);
+            
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            All(6)  = median(Theta);
+            
+            [c,l] = wavedec(DWTspatDat,6,'db4');
+            [~,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            All(7)  = median(Theta);
+            All(8)  = (1/size(Theta,2)) * sum(Theta).^2;
+            
+            %%Occ
+            spatDatOccERP = spatDatOcc(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
+            
+            Occ(1)  = rms(spatDatOccERP);
+            Occ(2) = length(find([0 diff(sign(spatDatOccERP))]~=0));
+            Occ(3) = (max(spatDatOccERP) - min(spatDatOccERP)) / std(spatDatOccERP);
+            
+            [~, ~, ~, Occ(4)] = findpeaks(-spatDatOcc, cfg.resampleFs, 'MinPeakWidth', feat.minPeakWidth, 'SortStr', 'descend', 'NPeaks', 1);
+            if isempty(Occ(4))
+                [~, ~, ~, Occ(4)] = findpeaks(-spatDatOcc, cfg.resampleFs, 'SortStr', 'descend', 'NPeaks', 1);
+            end
+            if isempty(Occ(4))
+                Occ(4) = 0;
+            end
+            
+            spatDatFilt  = ft_preproc_bandpassfilter(spatDatOcc, cfg.resampleFs, [3 7], cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
+            phaseDatStim = hilbert(spatDatOcc);
+            phaseDatStim = angle(spatDatOcc);
+            phaseDatRef = spatDatAll(feat.refCh,:);
+            phaseDatRef = exp(1j*phaseDatRef);
+            phaseDatRef = mean(phaseDatRef,1);
+            phaseDatRef = angle(phaseDatRef);
+            Occ(5) = std(phaseDatStim - phaseDatRef);
+            
+            DWTspatDat = [spatDatOcc cfg.padding(1,:)];
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior2.2');
+            Delta = appcoef(c,l,'bior2.2');
+            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
+            Delta = Delta(2:17);
+            Theta = Theta(2:16);
+            Alpha = Alpha(2:29);
+            Occ(6)  = max(Delta);
+            Occ(7)  = var(Theta);
+            Occ(8)  = median(Alpha);
+            Occ(9)  = min(Alpha);
+            Occ(10) = max(Alpha);
+            Occ(11) = entropy(Alpha/max(abs(Alpha)));
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior4.4');
+            Delta = appcoef(c,l,'bior2.2');
+            Delta = Delta(2:17);
+            Occ(12) = max(Delta);
+            
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [BetaGamma,Alpha,~] = detcoef(c,l,[4 5 6]);
+            BetaGamma = BetaGamma(2:55);
+            Alpha = Alpha(2:29);
+            Occ(13) = (1/size(Alpha,2)) * sum(((Alpha-mean(Alpha)) ./ std(Alpha)).^4-3);
+            Occ(14) = min(BetaGamma);
+            
+            [c,l] = wavedec(DWTspatDat,6,'db4');
+            [~,Alpha,Theta] = detcoef(c,l,[4 5 6]);
+            Alpha = Alpha(2:29);
+            Theta = Theta(2:16);
+            Occ(15)   = var(Theta);
+            Occ(16) = (1/size(Theta,2)) * sum(Theta).^2;
+            Occ(17)  = mean(Alpha);
+            
+            %% Temporal
+            spatDatTempERP = spatDatTemp(:, (feat.offsetSamp + feat.peakEndSamp)+1 : (feat.offsetSamp + feat.peakBegSamp));
+            
+            Temp(1) = max(spatDatTempERP)
+            
+            [~, Temp(2), ~, ~] = findpeaks(-spatDatTemp, cfg.resampleFs, 'MinPeakWidth', feat.minPeakWidth, 'SortStr', 'descend', 'NPeaks', 1);
+            if isempty(Temp(2))
+                [~, Temp(2), ~, ~] = findpeaks(-spatDatTemp, cfg.resampleFs, 'SortStr', 'descend', 'NPeaks', 1);
+            end
+            if isempty(Temp(2))
+                Temp(2)  = 0;
+            end
+            
+            DWTspatDat = [spatDatTemp cfg.padding(1,:)];
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior4.4');
+            [BetaGamma,Alpha,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            Alpha = Alpha(2:29);
+            BetaGamma = BetaGamma(2:55);
+            Temp(3) = median(Theta);
+            Temp(4) = min(Alpha);
+            Temp(5) = max(Alpha);
+            Temp(6) = (1/size(BetaGamma,2)) * sum(((BetaGamma-mean(BetaGamma)) ./ std(BetaGamma)).^4-3);
+            
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            BetaGamma = BetaGamma(2:55);
+            Temp(7) = min(Theta);
+            Temp(8) = mean(BetaGamma);
+            
+            [c,l] = wavedec(DWTspatDat,6,'db4');
+            [BetaGamma,~,Theta] = detcoef(c,l,[4 5 6]);
+            Theta = Theta(2:16);
+            BetaGamma = BetaGamma(2:55);
+            Temp(9)  = entropy(Theta/max(abs(Theta)));
+            Temp(10)  = entropy(BetaGamma/max(abs(BetaGamma)));
+            
+            %%Difference
+            DWTspatDat = [spatDatTemp cfg.padding(1,:)];
+            
+            [c,l] = wavedec(DWTspatDat,6,'bior2.2');
+            [~,Alpha,~] = detcoef(c,l,[4 5 6]);
+            Alpha = Alpha(2:29);
+            Diff(1) = min(Alpha);
+            
+            [c,l] = wavedec(DWTspatDat,6,'sym6');
+            [BetaGamma,Alpha,~] = detcoef(c,l,[4 5 6]);
+            Alpha = Alpha(2:29);
+            BetaGamma = BetaGamma(2:55);
+            Diff(2) = (1/size(Alpha,2)) * sum(((Alpha-mean(Alpha)) ./ std(Alpha)).^4-3);
+            Diff(3) = min(BetaGamma);
+            
+            [c,l] = wavedec(DWTspatDat,6,'db4');
+            [~,Alpha,~] = detcoef(c,l,[4 5 6]);
+            Alpha = Alpha(2:29);
+            Diff(4) = mean(Alpha);
+            
+            Diff(1) = Occ(9)  - Diff(1);
+            Diff(2) = Occ(13) - Diff(2);
+            Diff(3) = Occ(14) - Diff(3);
+            Diff(4) = Occ(17) - Diff(4);
+            
+            features = [All Occ Temp Diff];
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % Classification
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            %%LDA classifier
+            [lable, ~] = predict(classificationDiscriminant, features);
+            
+            if lable == 1
+                plotValue(count) = 1;
+                ft_write_event(cfg.dataset, event_detected);  
+            elseif lable == 3
+                plotValue(count) = 2;
+                ft_write_event(cfg.dataset, event_notDetected);   
+            end
+                        
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %% from here documentation and plotting                                       %%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            figure(1);
+            yNames = {' ', 'Artifact (Thres/Z)', 'Artifact (Z-value)', 'Artifact (Threshold)', 'No loom detected', 'Loom detected', ' '};
+            plot(plotCount,plotValue, 'Marker', '*', 'LineStyle', 'none')
+            set(gca,'ytick', (-4):2, 'yticklabel', yNames, 'YAxisLocation','right');
+            xlabel('Trial number');
+            ylim([-4 2])
+            xlim([count-10 count+1])
+            drawnow          
+            
         end
+    end % of for-loop
+    if length(cfg.event) > 25 && strcmp(cfg.event(end).type, 'T') && ~cfg.event(end).value == 1
+        ft_flush_event(cfg.dataset);
     end
-     
-     % Artifact rejection based on z-transformed data        
-     doc.zScore(count,1) = zValue(cfg.costumRej.zThreshold, procDat);
-     
-     % Documentation and output of artifact rejection results
-    if nnz(doc.threshold(count,:)) > cfg.costumRej.badElcRej && any(doc.zScore(count,1)) 
-        plotValue(count) = -3;
-        event_artifact.sample = endsample + 1;
-        ft_write_event(cfg.dataset, event_artifact);
-    elseif any(doc.threshold(count,:))
-        plotValue(count) = -1;
-        event_threshold.sample = endsample + 1;
-        ft_write_event(cfg.dataset, event_threshold);
-    elseif any(doc.zScore(count,1))
-        plotValue(count) = -2;
-        event_zScore.sample = endsample + 1;
-        ft_write_event(cfg.dataset, event_zScore);
-    else 
-       plotValue(count) = 0;
-    end
-    
-    % keep artifact detection of the read timing
-    tArti(end+1) = toc * 1000;
-    fprintf('Artifact detection of last trail took %5.2f ms.\n', tArti(end));
-    
-    figure(2);
-    yNames = {' ', 'Artifact (Thres/Z)', 'Artifact (Z-value)', 'Artifact (Threshold)', 'No loom detected', 'Loom detected', ' '};
-    plot(plotCount,plotValue, 'Marker', '*', 'LineStyle', 'none')
-    set(gca,'ytick', (-4):2, 'yticklabel', yNames, 'YAxisLocation','right');
-    xlabel('Trial number');
-    ylim([-4 2])
-    xlim([count-10 count+1])
-    drawnow
-     
-     if nnz(doc.threshold(count,:)) > cfg.costumRej.badElcRej || any(doc.zScore(count,1))   %% if more then 9 channels are bad, then reject
-         fprintf('Recjected trial %d from sample %d to %d due to artifacts.\n', count, begsample, endsample);
-        continue
-     end
-     
-%     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%     %% Spatial Filtering
-%     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%      % train.P has to be derived from the training data as for example:
-%      %   * mean amplitude in an interval around an ERP peak (spatial pattern = ERP topography)
-%      %   * a principal component of the covariance matrix
-%      %   * a principal component of the (real part of the) cross-spectrum at a particular frequency
-%      % See example: https://github.com/treder/LDA-beamformer
-%      
-%     [w,spatDat,covMat] = LDAbeamformer(train.P,procDat);
-% 
-%     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%     %% Feature extraction
-%     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%     % PCA afterwards to destinguish if a LDA can work
-%     
-%     % get ERP epoch
-%     feat.erp_epoch = spatDat(:, (feat.offsetSamp + feat.peakEndSamp):(feat.offsetSamp + feat.peakBegSamp)); % check that
-%     
-%     % Time-Domain: Amplitude (mean amplitude using RMS)  
-%     % Calculating new offset and adding it to the previous set peak
-%     % beginning and end time
-%     ampDat = rms(feat.erp_epoch,2);
-%     ampStdDat = std(feat.erp_epoch,2); %% Might be intressting for control
-%     
-%     % Time-Domain: Latency (fractional area latency)  
-%     % * calculate cumulative sum => last element correspond to area bellow
-%     %   ERP
-%     % * Substract half area (sum(erp)/2) from cumulative values
-%     % * The 50% value is the one closest to zero in the array (min(abs())
-%     % * But we are not intressted in the value, but in into the index to
-%     %   find the data
-%     
-%     for k = 1:size(feat.erp_epoch, 1)
-%         [~,latIdx(k)] = min(abs(cumsum(feat.erp_epoch(k,:))-sum(feat.erp_epoch(k,:))/feat.fractionalLat));
-%         latIdx(k)     = feat.peakBegSamp +  latIdx(k) - 1; % Overlap and thats why -1 ??? CHECK!!!
-%         latDat(k)     = latIdx(k) / cfg.resampleFs; % Translate back into ms for every channel
-%     end
-%     
-%     % Time-Domain: Duration (based on fractional area latency) 
-%     % not optimal as it depends on stepness of curve as well
-%     for k = 1:size(feat.erp_epoch, 1)
-%         [~,latIdxOn(k)]  = min(abs(cumsum(feat.erp_epoch(k,:))-sum(feat.erp_epoch(k,:))/feat.fractionOn));
-%         [~,latIdxOff(k)] = min(abs(cumsum(feat.erp_epoch(k,:))-sum(feat.erp_epoch(k,:))/feat.fractionOff));
-%         durDat(k)        = latIdxOff(k)/cfg.resampleFs - latIdxOn(k)/cfg.resampleFs; % Translate back into ms for every channel
-%     end
-%     
-%     %% Phase (Teodoro) over whole epoch
-%     phaseDat = hilbert(spatData);
-%     phaseDat = angle(phaseDat); % only phase info
-% 
-%     % reference phase
-%     phaseDatRef = phaseDat(:,feat.refCh); % determine reference channels
-%     phaseDatRef = exp(1j*phaseDatRef); % complex numbers (magnitude 1)
-%     phaseDatRef = mean(phaseDatRef,2);
-%     phaseDatRef = angle(phaseDatRef); % angle reference
-% 
-%     % phase difference
-%     phaseDat = phaseDat - repmat(phaseDatRef,1,size(phaseDat,2)); % angle differences
-%     
-%     % Frequency-Domain: 
-%     % Using the two highest and three smallest values of the covariance
-%     % matrix of the LDA beamformer. Method based on:(https://ieeexplore.ieee.org/document/4408441)
-%     procDatCSP = ft_preproc_bandpassfilter(procDat, hdr.Fs, [3 7], cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
-%     cspLowDat = train.csp'*procDatCSP;
-%     
-%     procDatCSP = ft_preproc_bandpassfilter(procDat, hdr.Fs, [3 20], cfg.bpfiltord, cfg.bpfilttype, cfg.bpfiltdir, cfg.instabilityfix);
-%     cspHighDat = train.csp'*procDatCSP;
-    
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %% Classification
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-     
-%     discrimination (LDA)
-%     m1 = median(tmpC1);  %mean(tmp_c1); % mean per channel
-%     m2 = median(tmpCM1); %mean(tmp_cm1);
-%     m = 0.5*(m1+m2);
-%     
-%     Regularization
-%     [s1,plamb_s1] = cov_shrink(tmpC1);
-%     [s2,plamb_s2] = cov_shrink(tmpCM1);
-%     sigR = 0.5*(s1+s2); % common covariance (spatial)
-%     
-%     w = pinv(sigR)*(m1-m2)';
-%     b= -w'*m';
-%     
-%     Classification OF TEST DATA
-%     out = w'*[tmpC1;tmpCM1]'+b;
-%     trues = [ones(1,size(tmpC1,1)) -1*ones(1,size(tmpCM1,1))];
-%     
-%     accs(numSamp) = mean(sign(out)==sign(trues));
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %% from here documentation and plotting 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    figure(3)
-    clf(3);
-    for j = 1:4
-        subplot(2,2,j);
-        hold on
-        x = [-cfg.pre.prestim : (cfg.pre.prestim + cfg.pre.poststim)/size(procDat,2) : cfg.pre.poststim];
-        x = x(1:end-1);
-        plot(x, dat(j,cfg.pre.preDiffSamp : end-cfg.pre.postDiffSamp))
-        plot(x, procDat(j,:))
-        xline(0);
-        yline(0);
-        hold off
-    end
-    drawnow
-    
-   end
- end % of for-loop
- if length(cfg.event) > 25 && strcmp(cfg.event(end).type, 'T') && ~cfg.event(end).value == 1
-     ft_flush_event(cfg.dataset);
- end
-% ft_flush_event(cfg.dataset);
+    % ft_flush_event(cfg.dataset);
 end % while true
- fprintf('Stimulus sequence ended. Recording was stopped.');
- %% save array (tarti, tread)      
+fprintf('Stimulus sequence ended. Recording was stopped.');
+%% save array (tarti, tread)

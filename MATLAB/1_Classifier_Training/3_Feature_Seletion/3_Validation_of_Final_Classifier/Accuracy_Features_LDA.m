@@ -1,5 +1,4 @@
-%% Validation of the LDA used for 11- to 12-month-old infants.
-
+%% Use:[AUC ACC] = Accuracy_Features_KNN(balanced2LoomNon, minVect(end,:))
 close all
 load('2nd_Train_LoomRand.mat');
 load('FilterMatrix_All_2nd_Session.mat');

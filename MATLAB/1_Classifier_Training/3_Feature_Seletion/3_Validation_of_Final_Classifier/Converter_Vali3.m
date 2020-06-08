@@ -1,13 +1,11 @@
-%% Converts and balances features of training scripts into classfier readable format
-
+%% Converts features of v5 training scripts into classfier readable format
 % clear all
 % close all
 
 load('randomSeed.mat');
 
-folder =  'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Features\Katja\1st_Session\Vali6';
+folder =  'C:\Users\Emanuel\OneDrive\NEVR_Thesis\Code\MATLAB\2_Feature_Extraction\Features\Katja\2nd_Session\Vali';
 mat = dir(strcat(folder,'\*.mat'));
-mat = mat(7:9)
 
 allFeatures3All = [];
 featuresLoom    = [];
@@ -52,7 +50,7 @@ lengthRows(3) = size(randomRows,1);
 
 shortestArray = min(lengthRows);
 
-rng(randomSeed);
+rng(7);
 
 [balancedLoom loomIdx] = datasample(featuresLoom, shortestArray, 'Replace', false);
 [balancedNonLoom nonloomIdx] = datasample(featuresNonLoom, shortestArray, 'Replace', false);
