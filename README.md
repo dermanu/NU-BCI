@@ -9,7 +9,7 @@ The online classification is based on [BCI2000](https://www.bci2000.org/mediawik
 The E-Prime folder contains the upgraded stimulus paradigm programmed in E-Prime 2. It enables communication of the stimulus triggers to BCI2000 via UDP.
 
 **MATLAB:**
-The MATLAB folder contains all codes used for the training of the classification models and the final online classifier. For its execution, the FieldTrip Toolbox, the MATLAB Signal Processing Toolbox, the MATLAB Statistics and Machine Learning Toolbox, and MATLAB Wavelet Toolbox are needed.
+The MATLAB folder contains all codes used for the training of the classification models and the final online classifier. For its execution, the [FieldTrip Toolbox](http://www.fieldtriptoolbox.org/), the MATLAB Signal Processing Toolbox, the MATLAB Statistics and Machine Learning Toolbox, and MATLAB Wavelet Toolbox are needed.
 
 **1.**	The first folder contains code used for the training of the classifier:
 
