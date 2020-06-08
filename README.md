@@ -3,7 +3,7 @@ This repository contains all relevant codes used for the implementation of an on
 The project was part of a Master thesis in Neuroscience at the Norges teknisk-naturvitenskapelige universitet and was conducted at the [NU-LAB](https://www.ntnu.edu/psychology/nulab#/view/about) under the supervision of Prof. Audrey van der Meer. No participant data is uploaded due to the regulations of Norges teknisk-naturvitenskapelige universitet.
 
 **BCI2000:**
-The online classification is based on [BCI2000](https://www.bci2000.org/mediawiki/index.php/Main_Page). The BCI2000 folder contains the batch and parameter file needed for the correct initiation of BCI2000 in the environment of the NU-LAB. The AmpServer soruce module worked for revision 6050.
+The online classification is based on [BCI2000](https://www.bci2000.org/mediawiki/index.php/Main_Page). The BCI2000 folder contains the batch and parameter file needed for the correct initiation of BCI2000 in the environment of the NU-LAB. The AmpServer soruce module worked togehter with the EGI NA300 amplifier from revision 6050.
 
 **E-PRIME:**
 The E-Prime folder contains the upgraded stimulus paradigm programmed in E-Prime 2. It enables communication of the stimulus triggers to BCI2000 via UDP.
