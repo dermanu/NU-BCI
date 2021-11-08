@@ -1,0 +1,4 @@
+Important:
+
+The file "ft_trailfun_nubci.m" has to be located in the folder ./fieldtrip/trailfun/
+This function is responsible for finding the triggers (looming onset, looming offset) and the annotations.
